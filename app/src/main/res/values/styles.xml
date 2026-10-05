@@ -1,0 +1,8 @@
+<resources>
+    <!-- Compose draws edge to edge; the window background only shows before the first frame. -->
+    <style name="Theme.Shelfie" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/shelfie_surface</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <color name="shelfie_surface">#FEF7FF</color>
+</resources>

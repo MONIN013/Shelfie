@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.Shelfie" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/shelfie_surface</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <color name="shelfie_surface">#151218</color>
+</resources>

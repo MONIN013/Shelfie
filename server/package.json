@@ -1,0 +1,19 @@
+{
+  "name": "shelfie-server",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "packageManager": "npm@11.9.0",
+  "scripts": {
+    "start": "node src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  }
+}

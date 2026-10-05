@@ -1,0 +1,13 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+.idea/
+*.iml
+.tools/
+artifacts/
+.asset-work/
+__pycache__/
+node_modules/
+server/data/
+.env

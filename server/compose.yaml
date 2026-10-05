@@ -1,0 +1,35 @@
+name: shelfie
+services:
+  api:
+    build: .
+    image: shelfie-api:0.5.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      PUBLIC_URL: https://monindev.net/shelfie
+      TRUST_PROXY: "1"
+    volumes:
+      - shelfie-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 384m
+    cpus: 1.0
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+volumes:
+  shelfie-data:
