@@ -256,7 +256,7 @@ class FilamentShelfRenderer : ShelfRenderer, ShelfSnapshotter, Choreographer.Fra
         return try {
             val bytes = item.book?.let {
                 val cover = net.monindev.shelfie.render.BookCovers.bitmap(context, it)
-                try { GeneratedBookAsset.create(assets, it, cover) } finally { cover?.recycle() }
+                try { GeneratedBookAsset.create(context, it, cover) } finally { cover?.recycle() }
             }
                 ?: assets.open(item.assetPath.removePrefix("assets/")).use { it.readBytes() }
             val buffer = ByteBuffer.allocateDirect(bytes.size).order(ByteOrder.nativeOrder())

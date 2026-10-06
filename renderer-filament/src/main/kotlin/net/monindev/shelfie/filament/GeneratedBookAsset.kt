@@ -1,6 +1,6 @@
 package net.monindev.shelfie.filament
 
-import android.content.res.AssetManager
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -10,6 +10,7 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import net.monindev.shelfie.core.BookInfo
+import net.monindev.shelfie.render.BookPhotos
 import net.monindev.shelfie.render.SceneComposer
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -20,15 +21,19 @@ import java.nio.ByteOrder
 internal object GeneratedBookAsset {
     private val palette = intArrayOf(0xff544465.toInt(), 0xff315d51.toInt(), 0xff46687f.toInt(), 0xff805448.toInt())
 
-    fun create(assets: AssetManager, book: BookInfo, cover: Bitmap? = null): ByteArray {
-        val original = assets.open(SceneComposer.BOOK_MODEL).use { it.readBytes() }
+    fun create(context: Context, book: BookInfo, downloadedCover: Bitmap? = null): ByteArray {
+        val original = context.assets.open(SceneComposer.BOOK_MODEL).use { it.readBytes() }
+        // Faces cut from the person's photos take precedence over a downloaded cover.
+        val spinePhoto = BookPhotos.bitmap(context, book.spineRegion, spine = true)
+        val cover = BookPhotos.bitmap(context, book.coverRegion) ?: downloadedCover
         val buffer = ByteBuffer.wrap(original).order(ByteOrder.LITTLE_ENDIAN)
         val jsonLength = buffer.getInt(12)
         val json = JSONObject(String(original,20,jsonLength,Charsets.UTF_8))
         val binaryOffset = 20 + jsonLength + 8
         val binary = ByteArrayOutputStream().apply { write(original,binaryOffset,original.size-binaryOffset) }
-        // The binding takes the colour of the cover edge so that boards and spine read as one book.
-        val binding = cover?.getPixel(2, cover.height / 2) ?: palette[Math.floorMod(book.id.hashCode(), palette.size)]
+        // The binding takes the colour of the spine or cover edge so that boards and spine read as one book.
+        val binding = spinePhoto?.getPixel(spinePhoto.width / 2, 12) ?: cover?.getPixel(2, cover.height / 2)
+            ?: palette[Math.floorMod(book.id.hashCode(), palette.size)]
         fun linear(component: Int): Double { val c = component / 255.0; return if (c <= .04045) c / 12.92 else Math.pow((c + .055) / 1.055, 2.4) }
         val materials = json.getJSONArray("materials")
         for (m in 0 until materials.length()) {
@@ -41,7 +46,8 @@ internal object GeneratedBookAsset {
         for (i in 0 until images.length()) {
             val image = images.getJSONObject(i)
             val spine = image.optString("name").contains("spine", ignoreCase = true)
-            val bytes = if (!spine && cover != null) ByteArrayOutputStream().also { cover.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+            val photo = if (spine) spinePhoto else cover
+            val bytes = if (photo != null) ByteArrayOutputStream().also { photo.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
                 else texture(book, spine, binding)
             while(binary.size()%4 != 0) binary.write(0)
             val view = views.getJSONObject(image.getInt("bufferView"))
@@ -58,6 +64,8 @@ internal object GeneratedBookAsset {
         out.putInt(0x46546c67);out.putInt(2);out.putInt(out.capacity());out.putInt(padded);out.putInt(0x4e4f534a)
         out.put(encoded);repeat(padded-encoded.size){out.put(32.toByte())}
         out.putInt(binary.size());out.putInt(0x004e4942);out.put(binary.toByteArray())
+        spinePhoto?.recycle()
+        if (cover !== downloadedCover) cover?.recycle()
         return out.array()
     }
     private fun texture(book: BookInfo, spine: Boolean, background: Int): ByteArray {

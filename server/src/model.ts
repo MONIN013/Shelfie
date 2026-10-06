@@ -26,7 +26,19 @@ export interface Book {
   automaticThicknessMm?: number;
   automaticThicknessSource?: 'bibliography';
   isbn?: string;
+  coverRegion?: PhotoRegion;
+  spineRegion?: PhotoRegion;
   pageCountEstimated?: boolean;
+}
+/** Part of a photo kept on the owner's device. The photo itself is never uploaded. */
+export interface PhotoRegion { image: string; corners: number[]; }
+function photoRegion(value: unknown): PhotoRegion {
+  const r=object(value);const image=text(r.image,68);
+  check(/^[a-f0-9]{64}\.jpg$/.test(image));
+  check(Array.isArray(r.corners)&&r.corners.length===8&&r.corners.every(v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1));
+  const c=r.corners as number[];
+  for(let i=0;i<4;i++) {const j=(i+1)%4,k=(i+2)%4;check((c[j*2]!-c[i*2]!)*(c[k*2+1]!-c[j*2+1]!)-(c[j*2+1]!-c[i*2+1]!)*(c[k*2]!-c[j*2]!)>.000001);}
+  return {image,corners:c};
 }
 export function parseBook(input: unknown): Book {
   const b = object(input);
@@ -49,6 +61,8 @@ export function parseBook(input: unknown): Book {
     ...(measured == null ? {} : {measuredThicknessMm: measured as number}),
     ...(automatic==null?{}:{automaticThicknessMm:automatic as number,automaticThicknessSource:'bibliography' as const}),
     ...(b.isbn==null?{}:{isbn:b.isbn as string}),
+    ...(b.coverRegion==null?{}:{coverRegion:photoRegion(b.coverRegion)}),
+    ...(b.spineRegion==null?{}:{spineRegion:photoRegion(b.spineRegion)}),
     ...(b.pageCountEstimated?{pageCountEstimated:true}:{}) };
 }
 export interface Item { id: string; bookIds: string[]; propId: string | null; row: number; x: number; orientation: 'SPINE' | 'COVER' | 'FLAT'; }
@@ -97,7 +111,8 @@ export function parseShelf(input: unknown): Shelf {
   }
   return {schemaVersion:4,theme:d.theme,items,books,shelf:spec};
 }
+/** Only placed books are published, without references to photos that stay on the owner's device. */
 export function publicShelf(shelf: Shelf): Shelf {
   const ids=new Set(shelf.items.flatMap(i=>i.bookIds));
-  return {...shelf,books:shelf.books.filter(b=>ids.has(b.id))};
+  return {...shelf,books:shelf.books.filter(b=>ids.has(b.id)).map(({coverRegion,spineRegion,...book})=>book)};
 }

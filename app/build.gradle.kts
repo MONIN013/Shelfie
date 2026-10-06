@@ -34,6 +34,7 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.5.0-alpha27")
     implementation("androidx.compose.foundation:foundation:1.10.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+    implementation("androidx.exifinterface:exifinterface:1.4.2")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     // Android 16 removed the reflective InputManager API used by Espresso 3.6.

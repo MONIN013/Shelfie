@@ -126,6 +126,18 @@ test('custom shelf and measured book dimensions survive cloud publication',async
   assert.deepEqual((await request('/v1/me/shelf','GET',undefined,token)).data.shelf.document,document);
 });
 
+test('photo regions are validated, kept in the private draft and never published',async t=>{
+  const {request,register}=await fixture(t);const token=await register();
+  const region={image:'a'.repeat(64)+'.jpg',corners:[0,0,1,0,1,1,0,1]};
+  assert.throws(()=>parseBook({...book,spineRegion:{...region,image:'../secret.jpg'}}));
+  assert.throws(()=>parseBook({...book,spineRegion:{...region,corners:[0,0,1,1,1,0,0,1]}}));
+  const document={...shelf,books:[{...book,spineRegion:region},unused]};
+  assert.equal((await request('/v1/me/shelf','PUT',{title:'写真の棚',note:'',document,revision:0},token)).status,200);
+  assert.deepEqual((await request('/v1/me/shelf','GET',undefined,token)).data.shelf.document.books[0].spineRegion,region);
+  const publication=await request('/v1/me/publication','POST',{revision:1},token);
+  assert.deepEqual(publication.data.document.books,[book]);
+});
+
 test('only current shelf schema with explicit dimensions can be saved',async t=>{
   const {request,register}=await fixture(t);const token=await register();
   for(const version of [undefined,1,2,3,99]) {

@@ -9,6 +9,7 @@ This JVM module owns the current document contract and has no Android dependenci
 - `ShelfEditor` commits whole valid documents and keeps up to 100 undo snapshots. New edits clear redo. Failed edits do not change geometry or history.
 - `preview` does not mutate. Snapping uses entry radius 0.14 and exit radius 0.24, with shelf edges, neighbors and equal free space as candidates.
 - `ShelfCodec` validates reads and writes. The Android store owns atomic I/O and recovery from write failure.
+- `coverRegion` / `spineRegion` refer to part of a photo stored on the device by SHA-256 name, with four normalized corners (top-left, top-right, bottom-right, bottom-left) that must form a clockwise convex quadrilateral.
 - `ShelfEditor()` starts from an empty 360 × 270 × 270 mm shelf. `ShelfGeometry.bookError` validates a single book, also for the device reading list.
 
 Run `./gradlew :core:test` from the repository root.

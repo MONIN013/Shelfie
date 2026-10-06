@@ -42,6 +42,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.monindev.shelfie.core.*
 import net.monindev.shelfie.render.BookCovers
+import net.monindev.shelfie.render.BookPhotos
 
 @Composable
 internal fun Glyph(@DrawableRes id: Int, contentDescription: String?, modifier: Modifier = Modifier,
@@ -134,17 +135,23 @@ internal fun Avatar(name: String, size: Dp = 40.dp) {
     }
 }
 
-/** Shows the downloaded cover; otherwise a title cover like the one drawn on the shelf. */
+/** Shows the face cut from a photo or the downloaded cover; otherwise a title cover like the one on the shelf. */
 @Composable
 internal fun BookThumb(book: BookInfo, width: Dp = 40.dp) {
     val context = LocalContext.current
-    var image by remember(book.coverUrl) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(book.coverUrl) {
-        if (BookCovers.fetch(context, book)) image = withContext(Dispatchers.IO) { BookCovers.bitmap(context, book)?.asImageBitmap() }
+    var image by remember(book.coverUrl, book.coverRegion, book.spineRegion) { mutableStateOf<ImageBitmap?>(null) }
+    val spineOnly = book.coverRegion == null && book.spineRegion != null
+    LaunchedEffect(book.coverUrl, book.coverRegion, book.spineRegion) {
+        image = withContext(Dispatchers.IO) { BookPhotos.bitmap(context, book.coverRegion ?: book.spineRegion, spineOnly)?.asImageBitmap() }
+        if (image == null && BookCovers.fetch(context, book)) image = withContext(Dispatchers.IO) { BookCovers.bitmap(context, book)?.asImageBitmap() }
     }
     val shape = RoundedCornerShape(if (width >= 80.dp) 8.dp else 4.dp)
     val modifier = Modifier.width(width).aspectRatio(book.widthMm.toFloat() / book.heightMm).clip(shape)
-    image?.let { Image(it, "${book.title}の表紙", modifier, contentScale = ContentScale.Crop) } ?: Box(
+    image?.let {
+        // A spine is narrow; show all of it on the book's colour rather than cropping it.
+        Image(it, "${book.title}の${if (spineOnly) "背表紙" else "表紙"}", modifier.background(bookTone(book.id)),
+            contentScale = if (spineOnly) ContentScale.Fit else ContentScale.Crop)
+    } ?: Box(
         modifier.background(bookTone(book.id)).padding(if (width >= 80.dp) 8.dp else 3.dp)
             .clearAndSetSemantics {},
     ) {

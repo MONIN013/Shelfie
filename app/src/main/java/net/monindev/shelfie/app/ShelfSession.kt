@@ -33,6 +33,8 @@ internal class ShelfSession(private val store: ShelfStore, private val scope: Co
     var moving by mutableStateOf(false)
     /** Lets other screens open the shelf settings, e.g. when a book is taller than the shelf. */
     var settingsRequested by mutableStateOf(false)
+    /** The book face being cut from a photo, shown over the whole app. */
+    var cropping by mutableStateOf<CropRequest?>(null)
 
     val saving: Boolean get() = queuedSaving || recovering
     val editable: Boolean get() = loaded && problem == null && !recovering

@@ -2,6 +2,9 @@
 
 package net.monindev.shelfie.app
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -25,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import net.monindev.shelfie.core.*
 
 internal const val MAX_PROPS = 6
@@ -104,6 +109,28 @@ private fun InfoRow(label: String, value: String, modifier: Modifier = Modifier)
 internal fun ItemDetailSheet(session: ShelfSession, item: ShelfItem, notify: Notifier, onMeasure: (BookInfo) -> Unit, onDismiss: () -> Unit) {
     val document = session.document
     val books = item.bookIds.map(document::book)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var picking by remember { mutableStateOf<Pair<String, BookFace>?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val target = picking
+        picking = null
+        if (uri != null && target != null) scope.launch {
+            try {
+                val name = PhotoLibrary.import(context, uri)
+                val book = session.document.book(target.first)
+                session.cropping = CropRequest(book.id, target.second, name,
+                    PhotoLibrary.initialCorners(context, name, target.second, book.widthMm, book.heightMm, book.thicknessMm))
+                onDismiss()
+            } catch (_: Exception) {
+                notify.show("写真を読み込めませんでした")
+            }
+        }
+    }
+    fun pick(book: BookInfo, face: BookFace) {
+        picking = book.id to face
+        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberFullSheetState()) {
         key(item.id) {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 32.dp)
@@ -121,9 +148,17 @@ internal fun ItemDetailSheet(session: ShelfSession, item: ShelfItem, notify: Not
                     InfoRow("判型", "${book.formatLabel} · ${bookSize(book)}")
                     InfoRow("ページ数", pages(book))
                     InfoRow("厚さ", "${cm(book.thicknessMm)}\u00A0cm（${book.thicknessBasis}）")
-                    if (book in document.books) TextButton(onClick = { onMeasure(book) }, enabled = session.editable && !session.saving,
+                    TextButton(onClick = { onMeasure(book) }, enabled = session.editable && !session.saving,
                         modifier = Modifier.testTag("measure-${book.id}")) {
                         Glyph(R.drawable.ic_straighten, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("サイズを修正")
+                    }
+                    listOf(BookFace.SPINE to book.spineRegion, BookFace.COVER to book.coverRegion).forEach { (face, region) ->
+                        FacePhotoRow(face, region, enabled = session.editable && !session.saving,
+                            onPick = { pick(book, face) },
+                            onAdjust = { region?.let { session.cropping = CropRequest(book.id, face, it.image, it.corners); onDismiss() } },
+                            onRemove = {
+                                notify.edit(session.edit { it.updateBook(if (face == BookFace.SPINE) book.copy(spineRegion = null) else book.copy(coverRegion = null)) })
+                            })
                     }
                 }
                 if (item.propId == null) StackSection(session, item, notify)
@@ -136,6 +171,27 @@ internal fun ItemDetailSheet(session: ShelfSession, item: ShelfItem, notify: Not
                     Glyph(R.drawable.ic_do_not_disturb_on, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("棚から外す")
                 }
             }
+        }
+    }
+}
+
+/** Whether a face uses a part of the person's photo, with the actions to set, adjust or drop it. */
+@Composable
+private fun FacePhotoRow(face: BookFace, region: PhotoRegion?, enabled: Boolean, onPick: () -> Unit, onAdjust: () -> Unit, onRemove: () -> Unit) {
+    val name = if (face == BookFace.SPINE) "背表紙" else "表紙"
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("${name}の画像", style = MaterialTheme.typography.bodyMedium)
+            Text(if (region != null) "写真から切り出し" else if (face == BookFace.SPINE) "書名から作成" else "書誌の表紙か書名から作成",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (region != null) {
+            TextButton(onClick = onRemove, enabled = enabled) { Text("外す") }
+            FilledTonalButton(onClick = onAdjust, enabled = enabled, shapes = ButtonDefaults.shapes(),
+                modifier = Modifier.testTag("adjust-${face.name.lowercase()}")) { Text("調整") }
+        } else FilledTonalButton(onClick = onPick, enabled = enabled, shapes = ButtonDefaults.shapes(),
+            modifier = Modifier.testTag("pick-${face.name.lowercase()}")) {
+            Glyph(R.drawable.ic_add_photo, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("写真から切り出す")
         }
     }
 }

@@ -6,7 +6,10 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -21,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import net.monindev.shelfie.core.BookInfo
+import net.monindev.shelfie.core.book
 
 class MainActivity : ComponentActivity() {
     var linkedPostId by mutableStateOf<String?>(null)
@@ -58,7 +62,18 @@ private fun ShelfieApp(activity: MainActivity) {
     var publishing by remember { mutableStateOf(false) }
     var swapping by remember { mutableStateOf<BookInfo?>(null) }
     var pendingPost by remember { mutableStateOf<String?>(null) }
-    val covered = adding != null || publishing
+    val covered = adding != null || publishing || session.cropping != null
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val request = session.cropping
+        if (uri != null && request != null) scope.launch {
+            try {
+                val name = PhotoLibrary.import(context, uri)
+                val book = session.document.book(request.bookId)
+                session.cropping = request.copy(image = name,
+                    corners = PhotoLibrary.initialCorners(context, name, request.face, book.widthMm, book.heightMm, book.thicknessMm))
+            } catch (_: Exception) { notify.show("写真を読み込めませんでした") }
+        }
+    }
 
     LaunchedEffect(Unit) { session.load() }
     LaunchedEffect(Unit) { session.writeQueuedSaves() }
@@ -121,6 +136,21 @@ private fun ShelfieApp(activity: MainActivity) {
         }
         if (publishing) Surface(Modifier.fillMaxSize()) {
             PublishScreen(activity, service, session, thumbnails, notify, onDismiss = { publishing = false })
+        }
+        session.cropping?.let { request ->
+            val book = session.document.books.firstOrNull { it.id == request.bookId }
+            if (book == null) LaunchedEffect(request) { session.cropping = null }
+            else Surface(Modifier.fillMaxSize()) {
+                PhotoCropScreen(request, book.title,
+                    onPickAnother = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    onSave = { region ->
+                        session.cropping = null
+                        val updated = if (request.face == BookFace.SPINE) book.copy(spineRegion = region) else book.copy(coverRegion = region)
+                        if (notify.edit(session.edit { it.updateBook(updated) }) == EditResult.APPLIED)
+                            notify.undoable(if (request.face == BookFace.SPINE) "背表紙の画像を保存しました" else "表紙の画像を保存しました")
+                    },
+                    onCancel = { session.cropping = null })
+            }
         }
         // On the shelf, messages sit above the editing panel instead of covering its buttons.
         val snackbarOffset = if (!covered && tab == Tab.SHELF) 72.dp + shelfPanelHeight() else 80.dp

@@ -216,7 +216,7 @@ private fun ConfirmDialog(action: Confirm, request: Request, onDismiss: () -> Un
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(when (action) {
-                    Confirm.PUBLISH -> "棚の本・小物・棚の名前・ひとこと・表示名が、みんなの棚と共有リンクで公開されます。棚に置いていない本、積読、お気に入りは公開されません。"
+                    Confirm.PUBLISH -> "棚の本・小物・棚の名前・ひとこと・表示名が、みんなの棚と共有リンクで公開されます。棚に置いていない本、積読、お気に入り、写真から切り出した画像は公開されません。"
                     Confirm.UNPUBLISH -> "みんなの棚と共有リンクから見られなくなります。"
                     Confirm.RESTORE -> "端末の棚を、クラウドに保存した棚で置き換えます。「元に戻す」で今の棚に戻せます。"
                     Confirm.DELETE -> "アカウント、公開中の棚、クラウドに保存した棚を削除します。端末の棚・積読・お気に入りは残ります。この操作は取り消せません。"

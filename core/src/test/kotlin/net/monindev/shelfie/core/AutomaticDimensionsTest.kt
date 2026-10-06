@@ -31,4 +31,16 @@ class AutomaticDimensionsTest {
         assertEquals(document,ShelfCodec.decode(ShelfCodec.encode(document)))
         assertThrows(IllegalArgumentException::class.java) { ShelfCodec.decode(ShelfCodec.encode(document).replace("\"pageCount\"","\"assetPath\": \"models/b01.glb\",\n\"pageCount\"")) }
     }
+    @Test fun photoRegionsValidateCornersAndRoundTrip() {
+        val image="a".repeat(64)+".jpg"
+        val region=PhotoRegion(image,listOf(0f,0f,1f,0f,1f,1f,0f,1f))
+        assertTrue(region.isValid())
+        assertFalse(region.copy(image="../secret.jpg").isValid())
+        assertFalse(region.copy(corners=listOf(0f,0f,1f,1f,1f,0f,0f,1f)).isValid())
+        assertFalse(region.copy(corners=listOf(0f,0f,0f,1f,1f,1f,1f,0f)).isValid())
+        assertFalse(region.copy(corners=listOf(0f,0f,1.2f,0f,1f,1f,0f,1f)).isValid())
+        val document=ShelfDocument(items=emptyList(),books=listOf(book.copy(spineRegion=region,coverRegion=region)))
+        assertEquals(document,ShelfCodec.decode(ShelfCodec.encode(document)))
+        assertFalse(ShelfGeometry.isValid(document.copy(books=listOf(book.copy(spineRegion=region.copy(image="x.jpg"))))))
+    }
 }

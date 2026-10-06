@@ -12,6 +12,23 @@ enum class Orientation { COVER, SPINE, FLAT }
 @Serializable
 data class ShelfSpec(val widthMm: Int = 900, val heightMm: Int = 400, val depthMm: Int = 300)
 
+/**
+ * Part of a photo stored on the device, mapped onto a book face. Corners are normalized and
+ * ordered top-left, top-right, bottom-right, bottom-left of the face; the photo is never altered.
+ */
+@Serializable
+data class PhotoRegion(val image: String, val corners: List<Float>) {
+    fun isValid(): Boolean {
+        if (!image.matches(Regex("[a-f0-9]{64}\\.jpg")) || corners.size != 8 || corners.any { !it.isFinite() || it !in 0f..1f }) return false
+        // Clockwise and convex, so the face cannot be folded or mirrored.
+        return (0..3).all { i ->
+            val j = (i + 1) % 4; val k = (i + 2) % 4
+            (corners[j * 2] - corners[i * 2]) * (corners[k * 2 + 1] - corners[j * 2 + 1]) -
+                (corners[j * 2 + 1] - corners[i * 2 + 1]) * (corners[k * 2] - corners[j * 2]) > .000001f
+        }
+    }
+}
+
 @Serializable
 data class ShelfItem(
     val id: String,
@@ -45,6 +62,8 @@ data class BookInfo(
     val automaticThicknessMm: Float? = null,
     val automaticThicknessSource: String? = null,
     val isbn: String? = null,
+    val coverRegion: PhotoRegion? = null,
+    val spineRegion: PhotoRegion? = null,
     val pageCountEstimated: Boolean = false,
 ) {
     // A page is one side of a leaf. Two cover boards add a fixed 2.6 mm.
@@ -157,6 +176,7 @@ object ShelfGeometry {
         if (book.automaticThicknessMm?.let { !it.isFinite() || it !in 1f..150f } == true) return "Invalid automatic thickness"
         if ((book.automaticThicknessMm == null) != (book.automaticThicknessSource == null) || book.automaticThicknessSource?.let { it != "bibliography" } == true) return "Invalid thickness source"
         if (book.isbn?.matches(Regex("[0-9]{13}|[0-9]{9}[0-9X]")) == false) return "Invalid ISBN"
+        if (listOfNotNull(book.coverRegion, book.spineRegion).any { !it.isValid() }) return "Invalid photo region"
         if (book.sourceUrl != null && !book.sourceUrl.matches(Regex("https://openlibrary\\.org/(works/OL[0-9]+W|books/OL[0-9]+M)|https://www\\.hanmoto\\.com/bd/isbn/[0-9]{13}"))) return "Invalid book source"
         if (book.coverUrl != null && !book.coverUrl.matches(Regex("https://covers\\.openlibrary\\.org/b/id/[0-9]+-M\\.jpg|https://cover\\.openbd\\.jp/[0-9]{13}\\.jpg"))) return "Invalid book cover"
         return null
